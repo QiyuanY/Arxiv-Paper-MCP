@@ -10,7 +10,7 @@ import { ArXivClient } from '@agentic/arxiv';
 import axios from "axios";
 import * as fs from "fs";
 import * as path from "path";
-import { PdfReader } from "pdfreader";
+import pdf from "pdf-parse";
 import { tmpdir } from "os";
 import { JSDOM } from "jsdom";
 
@@ -30,16 +30,114 @@ const server = new Server(
   }
 );
 
+// 搜索选项接口
+interface SearchOptions {
+  query: string;
+  maxResults?: number;
+  author?: string;
+  categories?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  sortBy?: 'relevance' | 'lastUpdatedDate' | 'submittedDate';
+  sortOrder?: 'ascending' | 'descending';
+}
+
 // 工具函数：搜索 arXiv 论文
-async function searchArxivPapers(query: string, maxResults: number = 5): Promise<{totalResults: number, papers: any[]}> {
+async function searchArxivPapers(options: SearchOptions): Promise<{totalResults: number, papers: any[]}> {
+  const {
+    query,
+    maxResults = 5,
+    author,
+    categories,
+    dateFrom,
+    dateTo,
+    sortBy,
+    sortOrder,
+  } = options;
+
   try {
+    // 构建 include 条件数组
+    const include: { field: string; value: string }[] = [
+      { field: "all", value: query }
+    ];
+
+    if (author) {
+      include.push({ field: "author", value: author });
+    }
+
+    if (categories && categories.length > 0) {
+      include.push({ field: "subject_category", value: categories.join(" OR ") });
+    }
+
+    // 如果有日期过滤，拼接到查询字符串中
+    let dateFilter = '';
+    if (dateFrom || dateTo) {
+      const from = dateFrom
+        ? dateFrom.replace(/-/g, '') + '000000'
+        : '000000000000';
+      const to = dateTo
+        ? dateTo.replace(/-/g, '') + '235959'
+        : '99991231235959';
+      dateFilter = `+AND+submittedDate:[${from} TO ${to}]`;
+    }
+
+    // 构建 searchQuery：如果有日期过滤，使用原始字符串拼接
+    const searchQuery = dateFilter
+      ? include.map(tag => `${tag.field === 'all' ? 'all' : tag.field === 'author' ? 'au' : 'cat'}:${tag.value}`).join('+AND+') + dateFilter
+      : { include };
+
+    // 构建 URL 参数（sortBy / sortOrder 不在 SearchParams 中，需手动追加）
+    const sortParam = sortBy ? `&sortBy=${sortBy}` : '';
+    const orderParam = sortOrder ? `&sortOrder=${sortOrder}` : '';
+
+    // 如果有自定义排序参数，使用原始 URL 调用 arXiv API
+    if (sortParam || orderParam) {
+      const queryString = typeof searchQuery === 'string'
+        ? searchQuery
+        : include.map(tag => {
+            const fieldMap: Record<string, string> = { all: 'all', author: 'au', subject_category: 'cat' };
+            return `${fieldMap[tag.field] || tag.field}:${tag.value}`;
+          }).join('+AND+');
+
+      const apiUrl = `https://export.arxiv.org/api/query?search_query=${queryString}&start=0&max_results=${maxResults}${sortParam}${orderParam}`;
+      const response = await axios.get(apiUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ArXiv-Paper-MCP/1.0)' },
+        timeout: 30000,
+      });
+
+      const dom = new JSDOM(response.data, { contentType: 'application/xml' });
+      const doc = dom.window.document;
+
+      const totalResults = parseInt(doc.querySelector('totalResults')?.textContent || '0', 10);
+      const entries = Array.from(doc.querySelectorAll('entry'));
+
+      const papers = entries.map((entry: any) => {
+        const idEl = entry.querySelector('id');
+        const titleEl = entry.querySelector('title');
+        const summaryEl = entry.querySelector('summary');
+        const publishedEl = entry.querySelector('published');
+        const authorEls = entry.querySelectorAll('author name');
+        const url = idEl?.textContent || '';
+        const urlParts = url.split('/');
+        const arxivId = urlParts[urlParts.length - 1];
+
+        return {
+          id: arxivId,
+          url,
+          title: (titleEl?.textContent || '').replace(/\s+/g, ' ').trim(),
+          summary: (summaryEl?.textContent || '').replace(/\s+/g, ' ').trim(),
+          published: publishedEl?.textContent || '',
+          authors: Array.from(authorEls).map((el: any) => ({ name: el.textContent || '' })),
+        };
+      });
+
+      return { totalResults, papers };
+    }
+
+    // 使用 @agentic/arxiv 库的标准搜索（无自定义排序）
     const results = await arxivClient.search({
       start: 0,
-      searchQuery: {
-        include: [
-          { field: "all", value: query }
-        ]
-      },
+      searchQuery: { include: include as any },
       maxResults: maxResults
     });
 
@@ -292,25 +390,18 @@ async function downloadTempPdf(pdfUrl: string): Promise<string> {
 
 // 工具函数：提取 PDF 文本内容
 async function extractPdfText(pdfPath: string): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const texts: string[] = [];
-    new PdfReader().parseFileItems(pdfPath, (err, item) => {
-      if (err) {
-        console.error("PDF 解析失败:", err);
-        reject(new Error("PDF 解析失败: " + err));
-      } else if (!item) {
-        // 解析结束，拼成一段文本
-        let text = texts.join(' ').replace(/\s+/g, ' ').trim();
-        if (text.length < 100) {
-          reject(new Error("PDF 文本提取失败或内容过少"));
-        } else {
-          resolve(text);
-        }
-      } else if (item.text) {
-        texts.push(item.text);
-      }
-    });
-  });
+  try {
+    const dataBuffer = fs.readFileSync(pdfPath);
+    const data = await pdf(dataBuffer);
+    const text = data.text.replace(/\s+/g, ' ').trim();
+    if (text.length < 100) {
+      throw new Error("PDF 文本提取失败或内容过少");
+    }
+    return text;
+  } catch (error) {
+    console.error("PDF 解析失败:", error);
+    throw new Error(`PDF 解析失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 // 工具函数：解析论文内容（优先 HTML，回退 PDF）
@@ -393,7 +484,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "search_arxiv",
-        description: "搜索 arXiv 论文",
+        description: "搜索 arXiv 论文，支持按关键词、作者、学科分类、日期范围筛选，支持自定义排序",
         inputSchema: {
           type: "object",
           properties: {
@@ -405,6 +496,35 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "number",
               description: "最大结果数量",
               default: 5
+            },
+            author: {
+              type: "string",
+              description: "按作者名筛选"
+            },
+            categories: {
+              type: "array",
+              items: { type: "string" },
+              description: "arXiv 学科分类过滤，如 ['cs.AI', 'cs.CL']"
+            },
+            date_from: {
+              type: "string",
+              description: "起始日期过滤，格式 YYYY-MM-DD"
+            },
+            date_to: {
+              type: "string",
+              description: "截止日期过滤，格式 YYYY-MM-DD"
+            },
+            sort_by: {
+              type: "string",
+              enum: ["relevance", "lastUpdatedDate", "submittedDate"],
+              description: "排序方式",
+              default: "relevance"
+            },
+            sort_order: {
+              type: "string",
+              enum: ["ascending", "descending"],
+              description: "排序方向",
+              default: "descending"
             }
           },
           required: ["query"]
@@ -474,8 +594,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case "search_arxiv": {
-        const { query, maxResults = 5 } = args as { query: string; maxResults?: number };
-        const results = await searchArxivPapers(query, maxResults);
+        const {
+          query,
+          maxResults = 5,
+          author,
+          categories,
+          date_from,
+          date_to,
+          sort_by,
+          sort_order,
+        } = args as {
+          query: string;
+          maxResults?: number;
+          author?: string;
+          categories?: string[];
+          date_from?: string;
+          date_to?: string;
+          sort_by?: 'relevance' | 'lastUpdatedDate' | 'submittedDate';
+          sort_order?: 'ascending' | 'descending';
+        };
+        const results = await searchArxivPapers({
+          query,
+          maxResults,
+          author,
+          categories,
+          dateFrom: date_from,
+          dateTo: date_to,
+          sortBy: sort_by,
+          sortOrder: sort_order,
+        });
 
         return {
           content: [{

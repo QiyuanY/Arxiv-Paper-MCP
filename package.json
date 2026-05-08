@@ -5,49 +5,49 @@
     "type": "module",
     "main": "build/index.js",
     "bin": {
-      "arxiv-paper-mcp": "build/index.js"
+        "arxiv-paper-mcp": "build/index.js"
     },
     "scripts": {
-      "build": "tsc",
-      "dev": "tsc --watch",
-      "start": "node build/index.js",
-      "prepublishOnly": "npm run build"
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "start": "node build/index.js",
+        "prepublishOnly": "npm run build"
     },
     "keywords": [
-      "arxiv",
-      "paper",
-      "mcp",
-      "model-context-protocol",
-      "pdf",
-      "research"
+        "arxiv",
+        "paper",
+        "mcp",
+        "model-context-protocol",
+        "pdf",
+        "research"
     ],
     "author": {
-      "name": "yzfly",
-      "email": "yz.liu.me@gmail.com",
-      "url": "https://github.com/yzfly"
+        "name": "yzfly",
+        "email": "yz.liu.me@gmail.com",
+        "url": "https://github.com/yzfly"
     },
     "license": "MIT",
     "repository": {
-      "type": "git",
-      "url": "https://github.com/yzfly/arxiv-paper-mcp.git"
+        "type": "git",
+        "url": "https://github.com/yzfly/arxiv-paper-mcp.git"
     },
     "bugs": {
-      "url": "https://github.com/yzfly/arxiv-paper-mcp/issues"
+        "url": "https://github.com/yzfly/arxiv-paper-mcp/issues"
     },
     "homepage": "https://github.com/yzfly/arxiv-paper-mcp#readme",
     "engines": {
-      "node": ">=18.0.0"
+        "node": ">=18.0.0"
     },
     "dependencies": {
-      "@agentic/arxiv": "^7.6.7",
-      "@modelcontextprotocol/sdk": "^0.6.0",
-      "axios": "^1.7.9",
-      "jsdom": "^25.0.0",
-      "pdfreader": "^3.0.3"
+        "@agentic/arxiv": "^7.6.7",
+        "@modelcontextprotocol/sdk": "^0.6.0",
+        "axios": "^1.7.9",
+        "jsdom": "^25.0.0",
+        "pdf-parse": "^2.4.5"
     },
     "devDependencies": {
-      "@types/jsdom": "^21.1.6",
-      "@types/node": "^20",
-      "typescript": "^5.0.0"
+        "@types/jsdom": "^21.1.6",
+        "@types/node": "^20",
+        "typescript": "^5.0.0"
     }
-  }
+}
