@@ -138,11 +138,19 @@ function extractTextFromHtml(html: string): string {
     throw new Error(`HTML 解析失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
-// 工具函数：获取 AI 领域最新论文
-async function getRecentAIPapers(): Promise<string> {
+// 工具函数：获取指定领域最新论文
+async function getRecentPapers(category: string = 'cs.AI'): Promise<{
+  papers: Array<{
+    id: string;
+    title: string;
+    authors: string[];
+    summary: string;
+    url: string;
+  }>;
+}> {
   try {
-    const url = 'https://arxiv.org/list/cs.AI/recent';
-    console.log(`正在获取 AI 领域最新论文: ${url}`);
+    const url = `https://arxiv.org/list/${category}/recent`;
+    console.log(`正在获取 ${category} 领域最新论文: ${url}`);
 
     const response = await axios({
       method: 'GET',
@@ -153,9 +161,71 @@ async function getRecentAIPapers(): Promise<string> {
       }
     });
 
-    return response.data;
+    const dom = new JSDOM(response.data);
+    const document = dom.window.document;
+
+    const papers: Array<{
+      id: string;
+      title: string;
+      authors: string[];
+      summary: string;
+      url: string;
+    }> = [];
+
+    // arXiv listing pages use <dt> and <dd> pairs
+    const dts = document.querySelectorAll('dt');
+    const dds = document.querySelectorAll('dd');
+
+    const count = Math.min(dts.length, dds.length);
+
+    for (let i = 0; i < count; i++) {
+      const dt = dts[i];
+      const dd = dds[i];
+
+      // Extract arXiv ID from the link in the <dt>
+      const idLink = dt.querySelector('a[href^="/abs/"]');
+      if (!idLink) continue;
+      const href = idLink.getAttribute('href') || '';
+      const id = href.replace('/abs/', '');
+      if (!id) continue;
+
+      // Extract title from <dd> - look for .list-title
+      const titleEl = dd.querySelector('.list-title');
+      const title = titleEl
+        ? titleEl.textContent!.replace('Title:', '').trim()
+        : '';
+
+      // Extract authors from <dd> - look for .list-authors
+      const authorsEl = dd.querySelector('.list-authors');
+      const authors: string[] = [];
+      if (authorsEl) {
+        const authorLinks = authorsEl.querySelectorAll('a');
+        authorLinks.forEach((a: HTMLAnchorElement) => {
+          const name = a.textContent!.trim();
+          if (name) authors.push(name);
+        });
+      }
+
+      // Extract abstract/summary from <dd> - look for .mathjax or .abstract
+      const abstractEl = dd.querySelector('.mathjax') || dd.querySelector('.abstract');
+      let summary = '';
+      if (abstractEl) {
+        summary = (abstractEl.textContent || '').trim().substring(0, 500);
+      }
+
+      papers.push({
+        id,
+        title,
+        authors,
+        summary,
+        url: `https://arxiv.org/abs/${id}`,
+      });
+    }
+
+    console.log(`成功解析 ${papers.length} 篇 ${category} 最新论文`);
+    return { papers };
   } catch (error) {
-    console.error("获取最新 AI 论文时出错:", error);
+    console.error(`获取 ${category} 最新论文时出错:`, error);
     throw new Error(`获取最新论文失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -168,10 +238,10 @@ function getArxivPdfUrl(input: string): string {
     if (input.startsWith('http://') || input.startsWith('https://')) {
       const urlParts = input.split('/');
       arxivId = urlParts[urlParts.length - 1];
-      pdfUrl = input.replace('/abs/', '/pdf/') + '.pdf';
+      pdfUrl = input.replace('http://', 'https://').replace('/abs/', '/pdf/') + '.pdf';
     } else {
       arxivId = input;
-      pdfUrl = `http://arxiv.org/pdf/${arxivId}.pdf`;
+      pdfUrl = `https://arxiv.org/pdf/${arxivId}.pdf`;
     }
 
     return pdfUrl;
@@ -341,11 +411,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "get_recent_ai_papers",
-        description: "获取 arXiv AI 领域最新论文（cs.AI/recent）",
+        name: "get_recent_papers",
+        description: "获取 arXiv 指定领域最新论文。支持任意 arXiv 分类，如 cs.AI（人工智能）、cs.CL（计算语言学）、cs.CV（计算机视觉）、cs.LG（机器学习）、stat.ML（统计机器学习）、cs.NE（神经与进化计算）、cs.IR（信息检索）等。",
         inputSchema: {
           type: "object",
-          properties: {},
+          properties: {
+            category: {
+              type: "string",
+              description: "arXiv 分类，默认 cs.AI。常见分类：cs.AI, cs.CL, cs.CV, cs.LG, stat.ML, cs.NE, cs.IR",
+              default: "cs.AI"
+            }
+          },
           required: []
         }
       },
@@ -411,13 +487,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "get_recent_ai_papers": {
-        const htmlContent = await getRecentAIPapers();
+      case "get_recent_papers": {
+        const { category = 'cs.AI' } = args as { category?: string };
+        const result = await getRecentPapers(category);
 
         return {
           content: [{
             type: "text",
-            text: htmlContent
+            text: `获取到 ${result.papers.length} 篇 ${category} 领域最新论文：\n\n${result.papers.map((paper, index) =>
+              `${index + 1}. **${paper.title}**\n   ID: ${paper.id}\n   作者: ${paper.authors.join(', ')}\n   摘要: ${paper.summary}...\n   URL: ${paper.url}\n`
+            ).join('\n')}`
           }]
         };
       }
@@ -429,7 +508,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{
             type: "text",
-            text: `PDF 下载链接: ${pdfUrl}`
+            text: pdfUrl
           }]
         };
       }
