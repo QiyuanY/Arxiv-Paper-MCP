@@ -22,19 +22,19 @@
         "research"
     ],
     "author": {
-        "name": "yzfly",
-        "email": "yz.liu.me@gmail.com",
-        "url": "https://github.com/yzfly"
+        "name": "QiyuanY",
+        "email": "yqy1277@gmail.com",
+        "url": "https://github.com/QiyuanY"
     },
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/yzfly/arxiv-paper-mcp.git"
+        "url": "https://github.com/QiyuanY/Arxiv-Paper-MCP.git"
     },
     "bugs": {
-        "url": "https://github.com/yzfly/arxiv-paper-mcp/issues"
+        "url": "https://github.com/QiyuanY/Arxiv-Paper-MCP/issues"
     },
-    "homepage": "https://github.com/yzfly/arxiv-paper-mcp#readme",
+    "homepage": "https://github.com/QiyuanY/Arxiv-Paper-MCP#readme",
     "engines": {
         "node": ">=18.0.0"
     },
