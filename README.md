@@ -95,7 +95,7 @@ arxiv-paper-mcp
 ### 本地开发
 
 ```bash
-git clone https://github.com/yzfly/arxiv-paper-mcp.git
+git clone https://github.com/QiyuanY/Arxiv-Paper-MCP.git
 cd arxiv-paper-mcp
 npm install
 npm run dev      # 监听模式编译

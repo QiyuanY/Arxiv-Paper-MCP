@@ -13,7 +13,7 @@ import { getArxivPdfUrl, parsePaperContent } from "./tools/paper.js";
 const server = new Server(
   {
     name: "arxiv-paper-mcp",
-    version: "1.2.0",
+    version: "1.2.1",
   },
   {
     capabilities: {

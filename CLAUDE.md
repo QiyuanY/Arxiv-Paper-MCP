@@ -18,13 +18,13 @@ Single-file MCP server (`src/index.ts`, ~470 lines) that bridges AI assistants w
 
 **Four MCP tools exposed:**
 - `search_arxiv` — keyword search via `@agentic/arxiv`
-- `get_recent_ai_papers` — fetches `arxiv.org/list/cs.AI/recent`
+- `get_recent_papers` — fetches recent papers from specified arXiv category
 - `get_arxiv_pdf_url` — converts arXiv ID/URL to PDF download link
 - `parse_paper_content` — extracts full paper text (HTML-first, PDF fallback)
 
-**Content extraction pipeline:** Tries fetching the HTML version from `arxiv.org/html/{id}` first (parsed with jsdom). Falls back to downloading the PDF and extracting text with `pdfreader`. Temp PDF files are cleaned up in `finally` blocks.
+**Content extraction pipeline:** Tries fetching the HTML version from `arxiv.org/html/{id}` first (parsed with jsdom). Falls back to downloading the PDF and extracting text with `pdf-parse`. Temp PDF files are cleaned up in `finally` blocks.
 
-**Key dependencies:** `@modelcontextprotocol/sdk`, `@agentic/arxiv`, `axios`, `jsdom`, `pdfreader`
+**Key dependencies:** `@modelcontextprotocol/sdk`, `@agentic/arxiv`, `axios`, `jsdom`, `pdf-parse`
 
 ## Key Patterns
 
