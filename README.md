@@ -14,13 +14,13 @@
 ### NPX 方式（推荐）
 
 ```bash
-npx @langgpt/arxiv-paper-mcp
+npx @qiyuany/arxiv-paper-mcp
 ```
 
 ### 全局安装
 
 ```bash
-npm install -g @langgpt/arxiv-paper-mcp
+npm install -g @qiyuany/arxiv-paper-mcp
 arxiv-paper-mcp
 ```
 
@@ -35,7 +35,7 @@ arxiv-paper-mcp
   "mcpServers": {
     "arxiv-paper-mcp": {
       "command": "npx",
-      "args": ["-y", "@langgpt/arxiv-paper-mcp@latest"]
+      "args": ["-y", "@qiyuany/arxiv-paper-mcp@latest"]
     }
   }
 }

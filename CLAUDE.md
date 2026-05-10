@@ -14,7 +14,7 @@ No test framework is configured.
 
 ## Architecture
 
-Single-file MCP server (`src/index.ts`, ~470 lines) that bridges AI assistants with arXiv. Published as `@langgpt/arxiv-paper-mcp` on npm. Communicates via stdio transport.
+Single-file MCP server (`src/index.ts`, ~470 lines) that bridges AI assistants with arXiv. Published as `@qiyuany/arxiv-paper-mcp` on npm. Communicates via stdio transport.
 
 **Four MCP tools exposed:**
 - `search_arxiv` — keyword search via `@agentic/arxiv`

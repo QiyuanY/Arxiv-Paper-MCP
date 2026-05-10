@@ -1,6 +1,6 @@
 {
-    "name": "@langgpt/arxiv-paper-mcp",
-    "version": "1.2.1",
+    "name": "@qiyuany/arxiv-paper-mcp",
+    "version": "1.0.0",
     "description": "一个简化的基于 arXiv 的论文检索与内容解析 MCP 服务器",
     "type": "module",
     "main": "build/index.js",
