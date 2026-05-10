@@ -128,6 +128,7 @@ DATA_DIR/
 # API keys and secrets
 .env*
 !.env.example
+.npmrc
 
 # Test files
 test-data/
