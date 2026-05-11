@@ -63,7 +63,12 @@ export async function searchArxivPapers(options: SearchOptions): Promise<{totalR
     // 如果有自定义排序或日期参数，使用原始 URL 调用 arXiv API
     if (sortParam || orderParam || dateFilter) {
       const fieldMap: Record<string, string> = { all: 'all', author: 'au', subject_category: 'cat' };
-      const queryString = include.map(tag => `${fieldMap[tag.field] || tag.field}:${tag.value}`).join('+AND+') + dateFilter;
+      const queryString = include.map(tag => {
+        const field = fieldMap[tag.field] || tag.field;
+        // 对多词查询加双引号以启用精确短语匹配
+        const value = tag.value.includes(' ') ? `%22${encodeURIComponent(tag.value)}%22` : tag.value;
+        return `${field}:${value}`;
+      }).join('+AND+') + dateFilter;
 
       const apiUrl = `https://export.arxiv.org/api/query?search_query=${queryString}&start=0&max_results=${maxResults}${sortParam}${orderParam}`;
       const response = await axios.get(apiUrl, {
