@@ -1,6 +1,6 @@
 {
     "name": "@yqy1277/arxiv-paper-mcp",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "一个简化的基于 arXiv 的论文检索与内容解析 MCP 服务器",
     "type": "module",
     "main": "build/index.js",

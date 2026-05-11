@@ -1,12 +1,7 @@
 declare module "pdf-parse" {
-  interface PDFData {
-    numpages: number;
-    numrender: number;
-    info: object;
-    metadata: object;
-    text: string;
-    version: string;
+  export class PDFParse {
+    constructor(options: { data: Buffer } | { url: string });
+    getText(): Promise<{ text: string }>;
+    destroy(): Promise<void>;
   }
-  function pdf(dataBuffer: Buffer): Promise<PDFData>;
-  export = pdf;
 }

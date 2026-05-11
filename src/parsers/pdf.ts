@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import pdf from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { tmpdir } from "os";
 import axios from "axios";
 
@@ -42,10 +42,12 @@ export async function downloadTempPdf(pdfUrl: string): Promise<string> {
 }
 
 export async function extractPdfText(pdfPath: string): Promise<string> {
+  let parser: PDFParse | null = null;
   try {
     const dataBuffer = fs.readFileSync(pdfPath);
-    const data = await pdf(dataBuffer);
-    const text = data.text.replace(/\s+/g, ' ').trim();
+    parser = new PDFParse({ data: dataBuffer });
+    const result = await parser.getText();
+    const text = result.text.replace(/\s+/g, ' ').trim();
     if (text.length < 100) {
       throw new Error("PDF 文本提取失败或内容过少");
     }
@@ -53,5 +55,9 @@ export async function extractPdfText(pdfPath: string): Promise<string> {
   } catch (error) {
     console.error("PDF 解析失败:", error);
     throw new Error(`PDF 解析失败: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    if (parser) {
+      await parser.destroy().catch(() => {});
+    }
   }
 }
