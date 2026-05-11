@@ -1,12 +1,11 @@
 import axios from "axios";
 import { JSDOM } from "jsdom";
 
-export async function getRecentPapers(category: string = 'cs.AI'): Promise<{
+export async function getRecentPapers(category: string = 'cs.AI', maxResults: number = 10): Promise<{
   papers: Array<{
     id: string;
     title: string;
     authors: string[];
-    summary: string;
     url: string;
   }>;
 }> {
@@ -30,7 +29,6 @@ export async function getRecentPapers(category: string = 'cs.AI'): Promise<{
       id: string;
       title: string;
       authors: string[];
-      summary: string;
       url: string;
     }> = [];
 
@@ -63,23 +61,16 @@ export async function getRecentPapers(category: string = 'cs.AI'): Promise<{
         });
       }
 
-      const abstractEl = dd.querySelector('.mathjax') || dd.querySelector('.abstract');
-      let summary = '';
-      if (abstractEl) {
-        summary = (abstractEl.textContent || '').trim().substring(0, 500);
-      }
-
       papers.push({
         id,
         title,
         authors,
-        summary,
         url: `https://arxiv.org/abs/${id}`,
       });
     }
 
     console.log(`成功解析 ${papers.length} 篇 ${category} 最新论文`);
-    return { papers };
+    return { papers: papers.slice(0, maxResults) };
   } catch (error) {
     console.error(`获取 ${category} 最新论文时出错:`, error);
     throw new Error(`获取最新论文失败: ${error instanceof Error ? error.message : String(error)}`);

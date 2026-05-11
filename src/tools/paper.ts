@@ -6,18 +6,24 @@ import { paperContentCache } from "../utils/cache.js";
 export function getArxivPdfUrl(input: string): string {
   try {
     let arxivId: string;
-    let pdfUrl: string;
 
     if (input.startsWith('http://') || input.startsWith('https://')) {
+      // 已经是 PDF 链接，直接返回
+      if (input.includes('/pdf/')) {
+        const normalized = input.replace('http://', 'https://');
+        return normalized.endsWith('.pdf') ? normalized : normalized + '.pdf';
+      }
+      // 从 abs 链接提取 ID
       const urlParts = input.split('/');
       arxivId = urlParts[urlParts.length - 1];
-      pdfUrl = input.replace('http://', 'https://').replace('/abs/', '/pdf/') + '.pdf';
     } else {
       arxivId = input;
-      pdfUrl = `https://arxiv.org/pdf/${arxivId}.pdf`;
     }
 
-    return pdfUrl;
+    // 去除 ID 中可能残留的版本号后的 .pdf
+    arxivId = arxivId.replace(/\.pdf$/, '');
+
+    return `https://arxiv.org/pdf/${arxivId}.pdf`;
   } catch (error) {
     console.error("获取 PDF 链接时出错:", error);
     throw new Error(`获取PDF链接失败: ${error instanceof Error ? error.message : String(error)}`);

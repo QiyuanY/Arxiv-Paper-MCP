@@ -1,0 +1,16 @@
+# 忽略源文件（已编译到 build/）
+src/
+
+# 忽略测试文件
+test-*.mjs
+*.test.ts
+*.spec.ts
+
+# 忽略配置和文档文件
+CLAUDE.md
+.gitignore
+.npmignore
+
+# 忽略 TypeScript 源码映射（可选）
+*.d.ts.map
+*.js.map

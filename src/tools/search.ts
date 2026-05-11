@@ -1,4 +1,3 @@
-import { arxivClient } from "../utils/arxiv.js";
 import { searchCache } from "../utils/cache.js";
 import axios from "axios";
 import { JSDOM } from "jsdom";
@@ -57,78 +56,72 @@ export async function searchArxivPapers(options: SearchOptions): Promise<{totalR
       dateFilter = `+AND+submittedDate:[${from} TO ${to}]`;
     }
 
-    const sortParam = sortBy ? `&sortBy=${sortBy}` : '';
-    const orderParam = sortOrder ? `&sortOrder=${sortOrder}` : '';
+    const sortParam = sortBy ? `&sortBy=${sortBy}` : '&sortBy=relevance';
+    const orderParam = sortOrder ? `&sortOrder=${sortOrder}` : '&sortOrder=descending';
 
-    // 如果有自定义排序或日期参数，使用原始 URL 调用 arXiv API
-    if (sortParam || orderParam || dateFilter) {
-      const fieldMap: Record<string, string> = { all: 'all', author: 'au', subject_category: 'cat' };
-      const queryString = include.map(tag => {
-        const field = fieldMap[tag.field] || tag.field;
-        // 对多词查询加双引号以启用精确短语匹配
-        const value = tag.value.includes(' ') ? `%22${encodeURIComponent(tag.value)}%22` : tag.value;
-        return `${field}:${value}`;
-      }).join('+AND+') + dateFilter;
+    const fieldMap: Record<string, string> = { all: 'all', author: 'au', subject_category: 'cat' };
+    const queryString = include.map(tag => {
+      const field = fieldMap[tag.field] || tag.field;
+      // 对多词查询加双引号以启用精确短语匹配
+      const value = tag.value.includes(' ') ? `%22${encodeURIComponent(tag.value)}%22` : tag.value;
+      return `${field}:${value}`;
+    }).join('+AND+') + dateFilter;
 
-      const apiUrl = `https://export.arxiv.org/api/query?search_query=${queryString}&start=0&max_results=${maxResults}${sortParam}${orderParam}`;
-      const response = await axios.get(apiUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ArXiv-Paper-MCP/1.0)' },
-        timeout: 30000,
-      });
+    const apiUrl = `https://export.arxiv.org/api/query?search_query=${queryString}&start=0&max_results=${maxResults}${sortParam}${orderParam}`;
 
-      const dom = new JSDOM(response.data, { contentType: 'application/xml' });
-      const doc = dom.window.document;
-
-      const totalResults = parseInt(doc.querySelector('totalResults')?.textContent || '0', 10);
-      const entries = Array.from(doc.querySelectorAll('entry'));
-
-      const papers = entries.map((entry: any) => {
-        const idEl = entry.querySelector('id');
-        const titleEl = entry.querySelector('title');
-        const summaryEl = entry.querySelector('summary');
-        const publishedEl = entry.querySelector('published');
-        const authorEls = entry.querySelectorAll('author name');
-        const url = idEl?.textContent || '';
-        const urlParts = url.split('/');
-        const arxivId = urlParts[urlParts.length - 1];
-
-        return {
-          id: arxivId,
-          url,
-          title: (titleEl?.textContent || '').replace(/\s+/g, ' ').trim(),
-          summary: (summaryEl?.textContent || '').replace(/\s+/g, ' ').trim(),
-          published: publishedEl?.textContent || '',
-          authors: Array.from(authorEls).map((el: any) => ({ name: el.textContent || '' })),
-        };
-      });
-
-      const result = { totalResults, papers };
-      searchCache.set(cacheKey, result);
-      return result;
+    // arXiv API 限流重试（最多3次，间隔递增）
+    let response;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        response = await axios.get(apiUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ArXiv-Paper-MCP/1.0)' },
+          timeout: 30000,
+        });
+        break;
+      } catch (err: any) {
+        if (err?.response?.status === 429 && attempt < 3) {
+          const delay = attempt * 3000;
+          console.log(`arXiv API 限流，${delay}ms 后重试（第 ${attempt} 次）...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw err;
+      }
     }
 
-    // 使用 @agentic/arxiv 库的标准搜索
-    const results = await arxivClient.search({
-      start: 0,
-      searchQuery: { include: include as any },
-      maxResults: maxResults
-    });
+    if (!response) {
+      throw new Error('arXiv API 请求失败：无响应');
+    }
 
-    const papers = results.entries.map(entry => {
-      const urlParts = entry.url.split('/');
+    const dom = new JSDOM(response.data, { contentType: 'application/xml' });
+    const doc = dom.window.document;
+
+    // opensearch:totalResults 带命名空间前缀，需用完整标签名
+    const totalResultsEl = doc.getElementsByTagName('opensearch:totalResults').item(0);
+    const totalResults = parseInt(totalResultsEl?.textContent || '0', 10);
+    const entries = Array.from(doc.querySelectorAll('entry'));
+
+    const papers = entries.map((entry: any) => {
+      const idEl = entry.querySelector('id');
+      const titleEl = entry.querySelector('title');
+      const summaryEl = entry.querySelector('summary');
+      const publishedEl = entry.querySelector('published');
+      const authorEls = entry.querySelectorAll('author name');
+      const url = idEl?.textContent || '';
+      const urlParts = url.split('/');
       const arxivId = urlParts[urlParts.length - 1];
 
       return {
         id: arxivId,
-        url: entry.url,
-        title: entry.title.replace(/\s+/g, ' ').trim(),
-        summary: entry.summary.replace(/\s+/g, ' ').trim(),
-        published: entry.published,
-        authors: entry.authors || []
+        url,
+        title: (titleEl?.textContent || '').replace(/\s+/g, ' ').trim(),
+        summary: (summaryEl?.textContent || '').replace(/\s+/g, ' ').trim(),
+        published: publishedEl?.textContent || '',
+        authors: Array.from(authorEls).map((el: any) => ({ name: el.textContent || '' })),
       };
     });
 
-    const result = { totalResults: results.totalResults, papers };
+    const result = { totalResults, papers };
     searchCache.set(cacheKey, result);
     return result;
   } catch (error) {

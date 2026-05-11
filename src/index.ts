@@ -13,7 +13,7 @@ import { getArxivPdfUrl, parsePaperContent } from "./tools/paper.js";
 const server = new Server(
   {
     name: "arxiv-paper-mcp",
-    version: "1.0.2",
+    version: "1.1.0",
   },
   {
     capabilities: {
@@ -75,7 +75,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "get_recent_papers",
-        description: "获取 arXiv 指定领域最新论文。支持任意 arXiv 分类，如 cs.AI、cs.CL、cs.CV、cs.LG、stat.ML、cs.NE、cs.IR 等。",
+        description: "获取 arXiv 指定领域最新论文列表（标题、作者、链接）。如需摘要或论文详情，请使用 search_arxiv 或 parse_paper_content。",
         inputSchema: {
           type: "object",
           properties: {
@@ -83,6 +83,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "arXiv 分类，默认 cs.AI。常见分类：cs.AI, cs.CL, cs.CV, cs.LG, stat.ML, cs.NE, cs.IR",
               default: "cs.AI"
+            },
+            maxResults: {
+              type: "number",
+              description: "最大返回数量，默认 10",
+              default: 10
             }
           },
           required: []
@@ -150,22 +155,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: "text",
             text: `找到 ${results.papers.length} 篇相关论文（总计 ${results.totalResults} 篇）：\n\n${results.papers.map((paper: any, index: number) =>
-              `${index + 1}. **${paper.title}**\n   ID: ${paper.id}\n   发布日期: ${paper.published}\n   作者: ${paper.authors.map((author: any) => author.name || author).join(', ')}\n   摘要: ${paper.summary.substring(0, 300)}...\n   URL: ${paper.url}\n`
+              `${index + 1}. **${paper.title}**\n   ID: ${paper.id}\n   发布日期: ${paper.published}\n   作者: ${paper.authors.map((author: any) => author.name || author).join(', ')}\n   摘要: ${paper.summary.length > 300 ? paper.summary.substring(0, 300) + '...' : paper.summary}\n   URL: ${paper.url}\n`
             ).join('\n')}`
           }]
         };
       }
 
       case "get_recent_papers": {
-        const { category = 'cs.AI' } = args as { category?: string };
-        const result = await getRecentPapers(category);
+        const { category = 'cs.AI', maxResults = 10 } = args as { category?: string; maxResults?: number };
+        const result = await getRecentPapers(category, maxResults);
 
         return {
           content: [{
             type: "text",
             text: `获取到 ${result.papers.length} 篇 ${category} 领域最新论文：\n\n${result.papers.map((paper, index) =>
-              `${index + 1}. **${paper.title}**\n   ID: ${paper.id}\n   作者: ${paper.authors.join(', ')}\n   摘要: ${paper.summary}...\n   URL: ${paper.url}\n`
-            ).join('\n')}`
+              `${index + 1}. **${paper.title}**\n   ID: ${paper.id}\n   作者: ${paper.authors.join(', ')}\n   URL: ${paper.url}\n`
+            ).join('\n')}提示：使用 search_arxiv 或 parse_paper_content 获取论文摘要和详细内容。`
           }]
         };
       }
